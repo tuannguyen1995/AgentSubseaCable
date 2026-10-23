@@ -313,3 +313,18 @@ def test_appeal_retry_with_updated_evidence_url_succeeds(client):
     total_expected = escrow_amount + bond_amount
     assert int(contract.get_claimable_balance(args=[str(operator)]).call()) == total_expected
 
+
+def test_contract_deployment_with_integer_address_arg(client):
+    """
+    Guarantees that deploying the contract with a 160-bit integer address argument
+    (as serialized by GenLayer Studio: [312826998849709214553341560051459171502959144246])
+    does not throw AttributeError: 'int' object has no attribute 'as_bytes'.
+    """
+    int_addr = 312826998849709214553341560051459171502959144246
+    contract = client.deploy("contracts/contract.py", args=[int_addr])
+
+    stats = json.loads(contract.get_stats().call())
+    assert stats["owner"] == f"0x{int_addr:040x}".lower()
+    assert int(stats["total_policies"]) == 0
+
+

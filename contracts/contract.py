@@ -31,10 +31,27 @@ class ContractError(Exception):
 
 
 def _to_address(val) -> Address:
-    """Pass-through or safe conversion for Address in GenVM."""
+    """Converts any Address, int, str, or bytes into a valid GenLayer Address instance."""
     if isinstance(val, Address):
         return val
-    return val
+    if isinstance(val, int):
+        hex_str = f"0x{val:040x}"
+        return Address(hex_str)
+    if isinstance(val, str):
+        clean = val.strip()
+        if clean.startswith("0x") or clean.startswith("0X"):
+            clean = clean[2:]
+        clean = clean.zfill(40)[:40].lower()
+        return Address(f"0x{clean}")
+    if isinstance(val, (bytes, bytearray)):
+        if len(val) == 20:
+            return Address(bytes(val))
+        clean_hex = val.hex().zfill(40)[:40].lower()
+        return Address(f"0x{clean_hex}")
+    try:
+        return _to_address(str(val))
+    except Exception:
+        return _get_sender()
 
 
 def _addr_str(addr) -> str:
@@ -46,16 +63,25 @@ def _addr_str(addr) -> str:
     try:
         return addr.as_hex.lower()
     except Exception:
-        return str(addr).lower()
+        clean = str(addr).lower().strip()
+        if clean.startswith("0x"):
+            return clean
+        try:
+            int_val = int(clean)
+            return f"0x{int_val:040x}".lower()
+        except Exception:
+            return clean
 
 
 def _get_sender() -> Address:
     """Safely obtain transaction sender across GenVM runtime versions."""
     try:
-        return gl.message.sender_address
+        raw = gl.message.sender_address
+        return _to_address(raw)
     except Exception:
         try:
-            return gl.message.sender
+            raw = gl.message.sender
+            return _to_address(raw)
         except Exception:
             raise ContractError("Cannot resolve sender address.")
 
@@ -134,12 +160,12 @@ class Contract(gl.Contract):
     total_withdrawn_ledger: TreeMap[str, bigint]
 
     def __init__(self, initial_owner: Address = None):
-        target_owner = initial_owner
+        target_owner = _to_address(initial_owner) if initial_owner is not None else None
         if target_owner is None:
             try:
-                target_owner = _get_sender()
+                target_owner = _to_address(_get_sender())
             except Exception:
-                target_owner = None
+                target_owner = _to_address(0)
 
         self.owner = target_owner
         self.total_telecom_locked = bigint(0)
@@ -152,7 +178,7 @@ class Contract(gl.Contract):
 
     def _ensure_owner(self) -> None:
         if self.owner is None or _addr_str(self.owner) == "0x0000000000000000000000000000000000000000":
-            self.owner = _get_sender()
+            self.owner = _to_address(_get_sender())
 
     def _credit_payout(self, recipient: Address, amount: bigint) -> None:
         """
