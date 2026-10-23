@@ -29,9 +29,8 @@ Standard EVM blockchains cannot inspect real-time optical reflectometry (OTDR), 
 | **Network** | GenLayer StudioNet |
 | **Chain ID** | `61999` (Hex: `0xF22F`) |
 | **RPC Endpoint** | `https://studio.genlayer.com/api` |
-| **Contract Address** | `0xdf3A336aBc2d48728013A47046BEa22de260825F` |
-| **Deployment Tx Hash** | `0xb090176555c6e4dec0d3cf9dc435aff327d97baa5a547e8013ae6d73cbc72745` |
-| **Explorer / Studio** | [View on GenLayer Studio](https://studio.genlayer.com/address/0xdf3A336aBc2d48728013A47046BEa22de260825F) |
+| **Contract Address** | `0x6999C479E12c5429b829604660041406Bf621AF6` |
+| **Explorer / Studio** | [View on GenLayer Studio](https://studio.genlayer.com/address/0x6999C479E12c5429b829604660041406Bf621AF6) |
 | **Production dApp** | [https://agentsubseacable.vercel.app](https://agentsubseacable.vercel.app) |
 
 ---

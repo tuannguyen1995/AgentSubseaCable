@@ -3,11 +3,11 @@
   "chainId": 61999,
   "chainIdHex": "0xF22F",
   "rpcUrl": "https://studio.genlayer.com/api",
-  "contractAddress": "0x46e109149DF3734B16cb64B401654996F23e22c7",
+  "contractAddress": "0x6999C479E12c5429b829604660041406Bf621AF6",
   "transactionHash": "0x6dfbed6fd45ea489645c2d6360464a936a835cf677b58e09177b10ece7d881b2",
   "deployerAddress": "0xF34587A45C397281Ef6BDd839d4A1de2DEe393ad",
   "status": "5",
-  "deployedAt": "2026-10-23T15:05:57Z",
+  "deployedAt": "2026-10-23T15:15:00Z",
   "liveDappUrl": "https://agentsubseacable.vercel.app",
   "githubRepo": "https://github.com/tuannguyenvan95/AgentSubseaCable"
 }
