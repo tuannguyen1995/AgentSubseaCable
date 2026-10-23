@@ -1,0 +1,15 @@
+# Node & Frontend
+node_modules/
+dist/
+.vite/
+.env.local
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+artifacts/
+
+# Deployment & logs
+*.log
+.DS_Store

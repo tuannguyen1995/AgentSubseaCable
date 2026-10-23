@@ -1,0 +1,13 @@
+{
+  "network": "studionet",
+  "chainId": 61999,
+  "chainIdHex": "0xF22F",
+  "rpcUrl": "https://studio.genlayer.com/api",
+  "contractAddress": "0xdf3A336aBc2d48728013A47046BEa22de260825F",
+  "transactionHash": "0xb090176555c6e4dec0d3cf9dc435aff327d97baa5a547e8013ae6d73cbc72745",
+  "deployerAddress": "0xF34587A45C397281Ef6BDd839d4A1de2DEe393ad",
+  "status": "5",
+  "deployedAt": "2026-10-23T05:46:52Z",
+  "liveDappUrl": "https://agentsubseacable.vercel.app",
+  "githubRepo": "https://github.com/tuannguyenvan95/AgentSubseaCable"
+}
