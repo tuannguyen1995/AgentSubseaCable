@@ -5,7 +5,6 @@ import json
 import hashlib
 
 CANARY_TOKEN = "CANARY_AGENT_SUBSEA_CABLE_V1"
-ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 
 # Time & Cooling-Off Parameters
 SECONDS_PER_BLOCK = 3
@@ -32,30 +31,16 @@ class ContractError(Exception):
 
 
 def _to_address(val) -> Address:
-    """Converts any Address, int, or str into a valid GenLayer Address instance."""
+    """Pass-through or safe conversion for Address in GenVM."""
     if isinstance(val, Address):
         return val
-    if isinstance(val, int):
-        hex_str = f"0x{val:040x}"
-        return Address(hex_str)
-    if isinstance(val, str):
-        clean = val.strip()
-        if clean.startswith("0x") or clean.startswith("0X"):
-            return Address(clean.lower())
-        try:
-            int_val = int(clean)
-            return Address(f"0x{int_val:040x}")
-        except ValueError:
-            return Address(clean.lower())
-    if isinstance(val, (bytes, bytearray)):
-        return Address("0x" + val.hex())
-    return Address(str(val))
+    return val
 
 
 def _addr_str(addr) -> str:
     """Safely format an Address or address-like value into a lowercase hex string."""
     if addr is None:
-        return ZERO_ADDRESS
+        return "0x0000000000000000000000000000000000000000"
     if isinstance(addr, int):
         return f"0x{addr:040x}".lower()
     try:
@@ -67,12 +52,10 @@ def _addr_str(addr) -> str:
 def _get_sender() -> Address:
     """Safely obtain transaction sender across GenVM runtime versions."""
     try:
-        raw = gl.message.sender_address
-        return _to_address(raw)
+        return gl.message.sender_address
     except Exception:
         try:
-            raw = gl.message.sender
-            return _to_address(raw)
+            return gl.message.sender
         except Exception:
             raise ContractError("Cannot resolve sender address.")
 
@@ -150,13 +133,13 @@ class Contract(gl.Contract):
     total_pending_claims: bigint
     total_withdrawn_ledger: TreeMap[str, bigint]
 
-    def __init__(self, initial_owner: Address = Address(ZERO_ADDRESS)):
-        target_owner = _to_address(initial_owner) if initial_owner is not None else Address(ZERO_ADDRESS)
-        if _addr_str(target_owner) == ZERO_ADDRESS:
+    def __init__(self, initial_owner: Address = None):
+        target_owner = initial_owner
+        if target_owner is None:
             try:
-                target_owner = _to_address(_get_sender())
+                target_owner = _get_sender()
             except Exception:
-                pass
+                target_owner = None
 
         self.owner = target_owner
         self.total_telecom_locked = bigint(0)
@@ -168,8 +151,8 @@ class Contract(gl.Contract):
         return str(policy_id).strip()
 
     def _ensure_owner(self) -> None:
-        if _addr_str(self.owner) == ZERO_ADDRESS:
-            self.owner = _to_address(_get_sender())
+        if self.owner is None or _addr_str(self.owner) == "0x0000000000000000000000000000000000000000":
+            self.owner = _get_sender()
 
     def _credit_payout(self, recipient: Address, amount: bigint) -> None:
         """
@@ -223,7 +206,7 @@ class Contract(gl.Contract):
             raise ContractError("Valid cable system identifier required (>= 4 chars).")
 
         c_addr = _to_address(client)
-        if _addr_str(c_addr) == ZERO_ADDRESS:
+        if _addr_str(c_addr) == "0x0000000000000000000000000000000000000000":
             raise ContractError("Valid client telecom carrier address required.")
 
         s_addr = _to_address(_get_sender())
@@ -236,13 +219,12 @@ class Contract(gl.Contract):
         policy_id = str(self.policy_counter)
         current_time = self._get_current_timestamp()
         expires_at = current_time + dur_secs
-        empty_addr = Address(ZERO_ADDRESS)
 
         new_policy = SubseaPolicy(
             policy_id=policy_id,
             cable_operator=s_addr,
             client=c_addr,
-            dispute_initiator=empty_addr,
+            dispute_initiator=s_addr,
             escrow_amount=escrow,
             dispute_bond=bigint(0),
             cable_system_id=clean_cable,
@@ -557,16 +539,22 @@ Respond ONLY with valid JSON without markdown fences:
         self.total_telecom_locked = self.total_telecom_locked + staked
 
     @gl.public.write
-    def adjudicate_appeal(self, policy_id: str) -> None:
-        """Supreme Subsea Appellate Tribunal evaluates strictly against bound supplemental telemetry."""
+    def adjudicate_appeal(self, policy_id: str, new_evidence_url: str = "") -> None:
+        """
+        Supreme Subsea Appellate Tribunal evaluates strictly against bound supplemental telemetry.
+        Supports retry with updated evidence URL if previous fetch/parse failed.
+        """
         self._ensure_owner()
         pid = self._resolve_pid(policy_id)
         if pid not in self.policies:
             raise ContractError(f"Policy {pid} does not exist.")
 
         p = self.policies[pid]
-        if p.status != STATUS_DISPUTED:
-            raise ContractError("Policy is not in DISPUTED status.")
+        if p.status not in (STATUS_DISPUTED, STATUS_UNRESOLVED):
+            raise ContractError("Policy is not in DISPUTED or UNRESOLVED status awaiting appeal adjudication.")
+
+        if p.status == STATUS_UNRESOLVED and not str(p.verdict).startswith("APPEAL_UNRESOLVED_"):
+            raise ContractError("Policy is unresolved from outage alert, not an appeal.")
 
         sender_str = _addr_str(_get_sender())
         if (
@@ -576,7 +564,17 @@ Respond ONLY with valid JSON without markdown fences:
         ):
             raise ContractError("Permission Denied: Only operator, client, or owner can adjudicate appeal.")
 
+        clean_new_url = str(new_evidence_url).strip()
+        if clean_new_url:
+            if not _is_accredited_subsea_source(clean_new_url):
+                raise ContractError("Updated supplemental telemetry unauthenticated: Must originate from an accredited subsea/seismic authority.")
+            if sender_str != _addr_str(p.dispute_initiator) and sender_str != _addr_str(self.owner):
+                raise ContractError("Permission Denied: Only the appellant or owner can update supplemental telemetry URL.")
+            p.supplemental_evidence_url = clean_new_url
+
         bound_url = p.supplemental_evidence_url
+        if not bound_url:
+            raise ContractError("No supplemental evidence URL bound for appeal evaluation.")
         appellant = p.dispute_initiator
         prior_verdict = p.appeal_prior_verdict
         is_operator_appellant = (_addr_str(appellant) == _addr_str(p.cable_operator))
@@ -750,6 +748,43 @@ Respond ONLY with valid JSON:
                 p.status = STATUS_SETTLED_FORCE_MAJEURE
                 p.verdict = "FORCE_MAJEURE_EARTHQUAKE_VERIFIED"
                 self._credit_payout(p.cable_operator, escrow_val)
+
+    @gl.public.write
+    def refund_dispute_bond(self, policy_id: str) -> None:
+        """
+        Allows appellant to immediately reclaim 100% of their dispute bond if appeal evaluation
+        encountered an unresolved fetch or parse failure, without stranding funds.
+        Restores policy status back to STATUS_AWAITING_PAYOUT and pre-appeal verdict.
+        """
+        self._ensure_owner()
+        pid = self._resolve_pid(policy_id)
+        if pid not in self.policies:
+            raise ContractError(f"Policy {pid} does not exist.")
+
+        p = self.policies[pid]
+        if p.status != STATUS_UNRESOLVED or not str(p.verdict).startswith("APPEAL_UNRESOLVED_"):
+            raise ContractError("Dispute bond refund is only available when appeal adjudication encountered an unresolved fetch/parse failure.")
+
+        sender_str = _addr_str(_get_sender())
+        if sender_str != _addr_str(p.dispute_initiator) and sender_str != _addr_str(self.owner):
+            raise ContractError("Permission Denied: Only appellant or contract owner can trigger dispute bond refund.")
+
+        bond_val = p.dispute_bond
+        if bond_val <= bigint(0):
+            raise ContractError("No active dispute bond to refund.")
+
+        # Exactly update accounting: clear bond and decrement total_telecom_locked
+        p.dispute_bond = bigint(0)
+        self.total_telecom_locked = self.total_telecom_locked - bond_val if self.total_telecom_locked >= bond_val else bigint(0)
+
+        # Restore policy state and prior verdict
+        p.status = STATUS_AWAITING_PAYOUT
+        p.verdict = p.appeal_prior_verdict if p.appeal_prior_verdict and p.appeal_prior_verdict != "PENDING" else p.original_verdict
+        p.audit_completed_time = self._get_current_timestamp()
+        p.reason = f"[APPEAL BOND REFUNDED]: Adjudication unresolvable ({p.verdict}). 100% dispute bond ({int(bond_val)} wei) refunded to appellant. Policy restored to '{p.verdict}'."
+
+        # Credit payout to appellant via pull-payment
+        self._credit_payout(p.dispute_initiator, bond_val)
 
     @gl.public.write
     def resolve_stale_appeal(self, policy_id: str) -> None:
@@ -949,7 +984,7 @@ Respond ONLY with valid JSON:
             return "OPERATOR"
         if acc_str == _addr_str(p.client):
             return "CLIENT"
-        if acc_str == _addr_str(p.dispute_initiator) and acc_str != ZERO_ADDRESS:
+        if p.status in (STATUS_DISPUTED, STATUS_UNRESOLVED) and acc_str == _addr_str(p.dispute_initiator):
             return "APPELLANT"
         if acc_str == _addr_str(self.owner):
             return "OWNER"

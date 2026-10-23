@@ -71,6 +71,8 @@ export const PolicyCard: React.FC<PolicyCardProps> = ({
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [actionMessage, setActionMessage] = useState<string>('');
   const [actionError, setActionError] = useState<string>('');
+  const [retryUrl, setRetryUrl] = useState<string>('');
+  const [showRetryInput, setShowRetryInput] = useState<boolean>(false);
 
   const statusMeta = getStatusMeta(policy.status);
   const latencyAnalysis = formatLatency(policy.measured_latency_ms, policy.max_tolerable_latency_ms);
@@ -153,11 +155,20 @@ export const PolicyCard: React.FC<PolicyCardProps> = ({
     );
   };
 
-  const handleAdjudicateAppeal = () => {
+  const handleAdjudicateAppeal = (updatedUrl?: string) => {
+    const cleanUrl = updatedUrl ? updatedUrl.trim() : '';
     executeContractCall(
       'adjudicate_appeal',
+      cleanUrl ? [policy.policy_id, cleanUrl] : [policy.policy_id],
+      'Supreme Appellate Tribunal evaluated supplemental telemetry on-chain!'
+    );
+  };
+
+  const handleRefundDisputeBond = () => {
+    executeContractCall(
+      'refund_dispute_bond',
       [policy.policy_id],
-      'Supreme Appellate Tribunal rendered on-chain verdict!'
+      '100% dispute bond refunded to claimable balance! Policy restored to prior verdict.'
     );
   };
 
@@ -196,6 +207,7 @@ export const PolicyCard: React.FC<PolicyCardProps> = ({
   const canFinalize = isOperator || isClient || isOwner;
   const canReclaim = isOperator || isOwner;
   const canRecoverStale = isAppellant || isOperator || isClient || isOwner;
+  const canRefundBond = isAppellant || isOwner;
 
   // Stepper helper
   const getStepStatus = (stepIdx: number) => {
@@ -423,6 +435,31 @@ export const PolicyCard: React.FC<PolicyCardProps> = ({
           </div>
         )}
 
+        {/* Retry Appeal URL Input */}
+        {showRetryInput && (
+          <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-500/40 mb-3">
+            <label className="block text-[11px] font-mono text-purple-300 font-semibold mb-1">
+              New Accredited Evidence URL (USGS/NOAA/RIPE):
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={retryUrl}
+                onChange={(e) => setRetryUrl(e.target.value)}
+                placeholder="https://earthquake.usgs.gov/..."
+                className="flex-1 bg-abyss-950 border border-purple-500/30 rounded-lg px-2.5 py-1 text-xs font-mono text-white focus:outline-none focus:border-purple-400"
+              />
+              <button
+                onClick={() => handleAdjudicateAppeal(retryUrl)}
+                disabled={isProcessing}
+                className="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-mono font-bold transition flex items-center gap-1"
+              >
+                <span>Submit</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Interactive Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
           {/* Action 1: Trigger Outage Alert (Role: CLIENT) */}
@@ -496,13 +533,37 @@ export const PolicyCard: React.FC<PolicyCardProps> = ({
           {/* Action 5: Adjudicate Appeal (Role: Operator, Client, Owner) */}
           {policy.status === STATUS_DISPUTED && (
             <button
-              onClick={handleAdjudicateAppeal}
+              onClick={() => handleAdjudicateAppeal()}
               disabled={isProcessing || (!canAdjudicate && !!account)}
               className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-mono font-bold transition"
             >
               <Scale className="w-3.5 h-3.5" />
               <span>Adjudicate Appeal</span>
             </button>
+          )}
+
+          {/* Action 5b: Appellate Fetch/Parse Failure Recovery: Refund Bond or Retry URL */}
+          {policy.status === STATUS_UNRESOLVED && policy.verdict?.startsWith('APPEAL_UNRESOLVED_') && (
+            <>
+              <button
+                onClick={handleRefundDisputeBond}
+                disabled={isProcessing || (!canRefundBond && !!account)}
+                title={!canRefundBond && !!account ? 'Only appellant can reclaim dispute bond' : 'Reclaim 100% dispute bond safely'}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 text-xs font-mono font-bold transition"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Refund Bond (100%)</span>
+              </button>
+
+              <button
+                onClick={() => setShowRetryInput(!showRetryInput)}
+                disabled={isProcessing}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 text-xs font-mono font-bold transition"
+              >
+                <Zap className="w-3.5 h-3.5" />
+                <span>Retry Appeal</span>
+              </button>
+            </>
           )}
 
           {/* Action 6: Recover Stale Appeal */}
