@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, ShieldPlus, Layers, Clock, AlertCircle, CheckCircle2, Loader2, ArrowRight } from 'lucide-react';
 import { encodeCalldata, getSavedContractAddress, waitForTransactionReceipt } from '../config/genlayer';
 
@@ -7,6 +7,7 @@ interface CreatePolicyModalProps {
   onClose: () => void;
   onSuccess: () => void;
   account: string;
+  prefilledCable?: { id: string; latency: number };
 }
 
 const CABLE_PRESETS = [
@@ -23,6 +24,7 @@ export const CreatePolicyModal: React.FC<CreatePolicyModalProps> = ({
   onClose,
   onSuccess,
   account,
+  prefilledCable,
 }) => {
   const [cableId, setCableId] = useState('AAG-TRANS-PACIFIC-S1');
   const [clientAddress, setClientAddress] = useState('0x71c26b8e3ad5d321d227f2f111818d6a7822998a');
@@ -32,6 +34,13 @@ export const CreatePolicyModal: React.FC<CreatePolicyModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+
+  useEffect(() => {
+    if (prefilledCable) {
+      setCableId(prefilledCable.id);
+      setMaxLatencyMs(prefilledCable.latency);
+    }
+  }, [prefilledCable, isOpen]);
 
   if (!isOpen) return null;
 
@@ -96,7 +105,7 @@ export const CreatePolicyModal: React.FC<CreatePolicyModalProps> = ({
 
       await waitForTransactionReceipt(txHash);
 
-      setStatusMessage('Consensus reached! Subsea SLA Escrow activated successfully.');
+      setStatusMessage('Consensus reached! Subsea SLA Escrow activated on-chain.');
       setTimeout(() => {
         setIsSubmitting(false);
         onSuccess();

@@ -2,6 +2,11 @@
 """
 Deploy AgentSubseaCable Intelligent Contract to GenLayer Studionet (Chain 61999).
 RPC: https://studio.genlayer.com/api
+
+Usage:
+    python scripts/deploy_studionet.py
+    python scripts/deploy_studionet.py <DEPLOYER_PRIVATE_KEY>
+    DEPLOYER_PRIVATE_KEY="0x..." python scripts/deploy_studionet.py
 """
 
 import os
@@ -12,42 +17,47 @@ import time
 from pathlib import Path
 from genlayer_py import create_client, create_account, generate_private_key, studionet
 
-PK = os.environ.get("DEPLOYER_PRIVATE_KEY", "0x1b807b1df022a40f872596b11565e6b6856547dc66996bd3d5a85b376ea3a0ef").strip()
+# Support CLI arg, environment variable, or fallback test key
+CLI_PK = sys.argv[1].strip() if len(sys.argv) > 1 and sys.argv[1].strip().startswith("0x") else ""
+ENV_PK = os.environ.get("DEPLOYER_PRIVATE_KEY", "").strip()
+DEFAULT_TEST_PK = "0x1b807b1df022a40f872596b11565e6b6856547dc66996bd3d5a85b376ea3a0ef"
+
+PK = CLI_PK or ENV_PK or DEFAULT_TEST_PK
 
 
 def deploy():
-    print("=" * 75, flush=True)
+    print("=" * 80, flush=True)
     print("   Deploying AgentSubseaCable to GenLayer Studionet (Chain ID: 61999)   ", flush=True)
-    print("=" * 75, flush=True)
+    print("=" * 80, flush=True)
 
     try:
         account = create_account(PK)
     except Exception as e:
-        print(f"[!] Using generated key due to: {e}")
+        print(f"[!] Warning on provided key ({e}), generating a fresh keypair...", flush=True)
         account = create_account(generate_private_key())
 
     client = create_client(chain=studionet, account=account)
-    print(f"[+] Deployer Address: {account.address}", flush=True)
+    print(f"[+] Deployer Address : {account.address}", flush=True)
 
     try:
         bal = client.get_balance(account.address)
-        print(f"[+] Deployer Balance: {bal / 1e18} GEN", flush=True)
+        print(f"[+] Deployer Balance : {bal / 1e18} GEN", flush=True)
         if bal < 1e16:
             print("[+] Requesting faucet funds from Studionet...", flush=True)
             try:
                 client.fund_account(address=account.address, amount=1000)
-                print("[+] Funded account successfully!", flush=True)
+                print("[+] Funded account successfully with faucet GEN!", flush=True)
             except Exception as fe:
-                print(f"[!] Note on funding: {fe}", flush=True)
+                print(f"[!] Faucet note: {fe}", flush=True)
     except Exception as e:
-        print(f"[!] Balance check note: {e}", flush=True)
+        print(f"[!] Balance note: {e}", flush=True)
 
     contract_path = Path(__file__).parent.parent / "contracts" / "contract.py"
-    print(f"[+] Reading contract from: {contract_path}", flush=True)
+    print(f"[+] Reading contract code from: {contract_path}", flush=True)
     with open(contract_path, "r", encoding="utf-8") as f:
         contract_code = f.read()
 
-    print("[+] Submitting deploy_contract transaction to Studionet...", flush=True)
+    print("[+] Submitting deploy_contract transaction to GenLayer Studionet...", flush=True)
     tx_hash = None
     for attempt in range(1, 4):
         try:
@@ -73,14 +83,14 @@ def deploy():
     contract_address = receipt.get("contract_address") or receipt.get("recipient")
     status = receipt.get("status") or receipt.get("result")
 
-    print("\n" + "=" * 75)
+    print("\n" + "=" * 80)
     print("          DEPLOYMENT CONFIRMED ON GENLAYER STUDIONET             ")
-    print("=" * 75)
+    print("=" * 80)
     print(f"Contract Address : {contract_address}")
     print(f"Transaction Hash : {tx_hash}")
     print(f"Deployer Address : {account.address}")
     print(f"Receipt Status   : {status}")
-    print("=" * 75 + "\n")
+    print("=" * 80 + "\n")
 
     if not contract_address:
         print("[!] Warning: Could not find contract_address in receipt. Receipt dump:", flush=True)
@@ -106,7 +116,7 @@ def deploy():
         json.dump(output_info, f, indent=2)
     print(f"[+] Saved deployment details to {dep_file}")
 
-    # 2. Update frontend/.env if exists
+    # 2. Update frontend/.env
     env_file = Path(__file__).parent.parent / "frontend" / ".env"
     if env_file.exists():
         with open(env_file, "r", encoding="utf-8") as f:
@@ -116,7 +126,7 @@ def deploy():
             f.write(env_content)
         print(f"[+] Updated frontend/.env with {contract_address}")
 
-    # 3. Update frontend/src/config/genlayer.ts if exists
+    # 3. Update frontend/src/config/genlayer.ts
     genlayer_ts = Path(__file__).parent.parent / "frontend" / "src" / "config" / "genlayer.ts"
     if genlayer_ts.exists():
         with open(genlayer_ts, "r", encoding="utf-8") as f:

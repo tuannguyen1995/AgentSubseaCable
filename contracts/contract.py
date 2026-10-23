@@ -174,7 +174,7 @@ class Contract(gl.Contract):
     def _credit_payout(self, recipient: Address, amount: bigint) -> None:
         """
         Pure Pull-Payment accounting:
-        Credits beneficiary balance securely on-chain. Prevents loss of funds from transfer errors.
+        Credits beneficiary balance securely on-chain. Prevents loss of funds from transfer errors or reentrancy.
         """
         if amount <= bigint(0):
             return
@@ -303,7 +303,10 @@ class Contract(gl.Contract):
 
     @gl.public.write
     def adjudicate_cable_outage(self, policy_id: str) -> None:
-        """AI Subsea Tribunal evaluates OTDR optical continuity against USGS submarine earthquake coordinates."""
+        """
+        AI Subsea Tribunal evaluates OTDR optical continuity against USGS submarine earthquake coordinates.
+        Multi-Perspective Forensic Magistrate Consensus.
+        """
         self._ensure_owner()
         pid = self._resolve_pid(policy_id)
         if pid not in self.policies:
@@ -347,19 +350,18 @@ class Contract(gl.Contract):
             ev_hash = hashlib.sha256(raw_feed.encode("utf-8")).hexdigest()
 
             prompt = f"""You are the Chief Submarine Telecom & Hydrographic Geohazards Magistrate on GenLayer.
-Evaluate live OTDR optical reflectometry, traceroute RTT, and USGS seafloor seismic data for subsea cable: {cable_id}.
-SLA LATENCY GUARANTEE: <= {sla_latency} ms RTT
+Perform a multi-perspective forensic examination of live OTDR optical reflectometry, traceroute RTT, and USGS seafloor seismic data for subsea cable: {cable_id}.
+CONTRACTUAL SLA LATENCY GUARANTEE: <= {sla_latency} ms RTT
 
-TELEMETRY & SEISMIC OBSERVATION PAYLOAD:
-<telemetry_payload>
-{raw_feed[:4000]}
-</telemetry_payload>
-
-EVALUATION MANDATE:
-1. Extract cable_system_id confirmed in the telemetry report.
-2. Extract measured_latency_ms (Round-Trip Time in ms, or 9999 if full optical fiber cut).
-3. Extract detected_magnitude_richter (Richter scale x10, e.g. 5.8 Richter = 58; 0 if no tectonic event).
-4. Decision Rules:
+MULTI-PERSPECTIVE FORENSIC MANDATE:
+1. [Optoelectronics & Physical Layer Perspective]:
+   - Inspect optical backscatter attenuation, optical power levels, and Round-Trip Time (RTT).
+   - If optical fiber is severed (>5000ms RTT or total optical cut), record fiber severance.
+2. [Hydrographic & Tectonic Geohazards Perspective]:
+   - Correlate coordinates with USGS/NOAA submarine earthquake and seismic buoy datasets.
+   - Extract detected seismic magnitude (x10 on Richter scale, e.g. 5.8 Richter = 58; 0 if no tectonic event).
+   - If magnitude >= 5.5 Richter (55) along or near the cable corridor, this constitutes a Seabed Rupture / Turbidity Current Force Majeure event.
+3. [SLA Legal Magistrate Mandate]:
    - Force Majeure Earthquake: Epicenter near cable corridor AND Seismic Magnitude >= 5.5 Richter (55):
      Output "FORCE_MAJEURE_EARTHQUAKE_VERIFIED" (SLA breach excused due to natural catastrophe).
    - Confirmed SLA Breach: Measured latency >= {sla_latency} * 2 ms OR complete optical fiber cut (>5000 ms) with NO earthquake >= 5.5 Richter:
@@ -368,6 +370,11 @@ EVALUATION MANDATE:
      Output "PARTIAL_LATENCY_DEGRADATION" (40% compensation released, 60% preserved).
    - Link Compliant: Latency <= {sla_latency} ms:
      Output "FORCE_MAJEURE_EARTHQUAKE_VERIFIED" with compliant rationale.
+
+TELEMETRY & SEISMIC OBSERVATION PAYLOAD:
+<telemetry_payload>
+{raw_feed[:4000]}
+</telemetry_payload>
 
 SECURITY CANARY: Echo "{CANARY_TOKEN}" in JSON.
 Respond ONLY with valid JSON without markdown fences:
@@ -451,7 +458,7 @@ Respond ONLY with valid JSON without markdown fences:
             if str(mine.get("cable_system_id", "")).strip() != str(leader.get("cable_system_id", "")).strip():
                 return False
 
-            # Independent tolerance on measured latency
+            # Independent tolerance on measured latency (within 20ms)
             lat_diff = abs(int(mine.get("measured_latency_ms", 0)) - int(leader.get("measured_latency_ms", 0)))
             if lat_diff > 20:
                 return False
@@ -993,6 +1000,8 @@ Respond ONLY with valid JSON:
                     "created_at_time": str(p.created_at_time),
                     "expires_at_time": str(p.expires_at_time),
                     "audit_completed_time": str(p.audit_completed_time),
+                    "supplemental_evidence_url": p.supplemental_evidence_url,
+                    "appeal_prior_verdict": p.appeal_prior_verdict,
                     "dispute_filed_time": str(p.dispute_filed_time),
                 })
         return json.dumps(policies_list)

@@ -222,6 +222,7 @@ export function encodeCalldata(method: string, args: any[]): `0x${string}` {
 }
 
 export async function fetchUserRole(policyId: string, account: string): Promise<string> {
+  if (!account || !policyId) return 'OBSERVER';
   try {
     const role = await readContract('get_user_role', [policyId, account]);
     return String(role || 'OBSERVER');
@@ -231,6 +232,7 @@ export async function fetchUserRole(policyId: string, account: string): Promise<
 }
 
 export async function fetchRemainingCoolingOff(policyId: string): Promise<number> {
+  if (!policyId) return 0;
   try {
     const rem = await readContract('get_remaining_cooling_off_seconds', [policyId]);
     return Number(rem || 0);
@@ -352,99 +354,3 @@ export async function waitForTransactionReceipt(txHash: string, timeoutMs = 9000
   }
   throw new Error('Transaction receipt confirmation timeout.');
 }
-
-// ── Realistic Fallback / Demonstration Dataset ────────────────────────
-export const MOCK_POLICIES: SubseaPolicyData[] = [
-  {
-    policy_id: '1',
-    cable_operator: '0xF34587A45C397281Ef6BDd839d4A1de2DEe393ad',
-    client: '0x71c26b8e3ad5d321d227f2f111818d6a7822998a',
-    dispute_initiator: '0x0000000000000000000000000000000000000000',
-    escrow_amount: '3000000000000000000',
-    dispute_bond: '0',
-    cable_system_id: 'AAG-TRANS-PACIFIC-S1',
-    max_tolerable_latency_ms: 120,
-    telemetry_feed_url: 'https://atlas.ripe.net/api/v2/measurements/aag_fiber_cut_rtt.json',
-    evidence_hash: '9f83c18b76df6c9a382e75e9b89182379963e63b65ef31522f18375685a43ad3',
-    status: STATUS_SETTLED_SLA_BREACH,
-    verdict: 'OUTAGE_SLA_BREACH_COMPENSATED',
-    original_verdict: 'OUTAGE_SLA_BREACH_COMPENSATED',
-    reason: 'Complete optical fiber cut verified by OTDR at BU4 off Luzon. Zero seismic triggers detected.',
-    confidence: 99,
-    measured_latency_ms: 9999,
-    detected_magnitude_richter: 0,
-    created_at_time: '1760000000',
-    expires_at_time: '1762592000',
-    audit_completed_time: '1760000450',
-    dispute_filed_time: '0',
-  },
-  {
-    policy_id: '2',
-    cable_operator: '0xF34587A45C397281Ef6BDd839d4A1de2DEe393ad',
-    client: '0x88b37190d6e8b0a13d8d6f5c098e91d830b05591',
-    dispute_initiator: '0x0000000000000000000000000000000000000000',
-    escrow_amount: '2000000000000000000',
-    dispute_bond: '0',
-    cable_system_id: 'SEA-ME-WE-5-S2',
-    max_tolerable_latency_ms: 90,
-    telemetry_feed_url: 'https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&cable=smw5',
-    evidence_hash: 'b10a8db164e0754105b7a99be72e3fe5aa7968535ed35c9fc8088939c36d22ef',
-    status: STATUS_SETTLED_FORCE_MAJEURE,
-    verdict: 'FORCE_MAJEURE_EARTHQUAKE_VERIFIED',
-    original_verdict: 'FORCE_MAJEURE_EARTHQUAKE_VERIFIED',
-    reason: '6.2 magnitude submarine earthquake ruptured seabed trench. Natural Force Majeure event excused.',
-    confidence: 98,
-    measured_latency_ms: 9999,
-    detected_magnitude_richter: 62,
-    created_at_time: '1760050000',
-    expires_at_time: '1762642000',
-    audit_completed_time: '1760050500',
-    dispute_filed_time: '0',
-  },
-  {
-    policy_id: '3',
-    cable_operator: '0xF34587A45C397281Ef6BDd839d4A1de2DEe393ad',
-    client: '0x99a718b958c2214d023b08e5efbc49692485fa71',
-    dispute_initiator: '0x0000000000000000000000000000000000000000',
-    escrow_amount: '4000000000000000000',
-    dispute_bond: '0',
-    cable_system_id: 'TAT-14-TRANSATLANTIC',
-    max_tolerable_latency_ms: 85,
-    telemetry_feed_url: '',
-    evidence_hash: '',
-    status: STATUS_POLICY_OPEN,
-    verdict: 'PENDING',
-    original_verdict: 'PENDING',
-    reason: 'Subsea cable SLA active. Monitored for optical link continuity and subsea seismic anomalies.',
-    confidence: 0,
-    measured_latency_ms: 78,
-    detected_magnitude_richter: 0,
-    created_at_time: '1760100000',
-    expires_at_time: '1762692000',
-    audit_completed_time: '0',
-    dispute_filed_time: '0',
-  },
-  {
-    policy_id: '4',
-    cable_operator: '0xF34587A45C397281Ef6BDd839d4A1de2DEe393ad',
-    client: '0x2222222222222222222222222222222222222222',
-    dispute_initiator: '0x0000000000000000000000000000000000000000',
-    escrow_amount: '1500000000000000000',
-    dispute_bond: '0',
-    cable_system_id: 'FASTER-PACIFIC-N1',
-    max_tolerable_latency_ms: 80,
-    telemetry_feed_url: 'https://ndbc.noaa.gov/data/realtime2/faster_telemetry.txt',
-    evidence_hash: '3f6c8d19a4e2b0c79e61294812f8e1a90c1e847c2b3e4f5a6b7c8d9e0f1a2b3c',
-    status: STATUS_AWAITING_PAYOUT,
-    verdict: 'PARTIAL_LATENCY_DEGRADATION',
-    original_verdict: 'PARTIAL_LATENCY_DEGRADATION',
-    reason: 'Moderate Latency Degradation: Measured latency 115 ms exceeds agreed SLA (80 ms). 40% penalty applied.',
-    confidence: 94,
-    measured_latency_ms: 115,
-    detected_magnitude_richter: 0,
-    created_at_time: '1760120000',
-    expires_at_time: '1762712000',
-    audit_completed_time: '1760121000',
-    dispute_filed_time: '0',
-  }
-];
