@@ -13,3 +13,5 @@ artifacts/
 # Deployment & logs
 *.log
 .DS_Store
+
+.vercel
